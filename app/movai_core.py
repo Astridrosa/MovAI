@@ -128,10 +128,23 @@ def create_agent(api_key):
     )
 
     # Wrap RAG tool to pass the API key dynamically
-    def rag_tool_func(query):
-        chat_history = memory.load_memory_variables({}).get("chat_history", "")
-        full_query = f"{chat_history}\n\nUser: {query}"
-        return rag_search_movies(api_key, query)
+def rag_tool_func(query):
+        memory_vars = memory.load_memory_variables({})
+        history = memory_vars.get("chat_history", "")
+        
+        formatted = "Conversation History:\n"
+        for turn in history.split("\n"):
+            if "Human:" in turn:
+                formatted += f"User: {turn.split('Human:')[-1].strip()}\n"
+            elif "AI:" in turn:
+                formatted += f"Assistant: {turn.split('AI:')[-1].strip()}\n"
+
+        full_query = f"""{formatted}
+
+Current question: {query}
+Use the conversation above to answer accurately."""
+        
+        return rag_search_movies(api_key, full_query)
 
     tools = [
         Tool(name="RAGSearch", func=rag_tool_func, description="Answer any movie-related question (title, actor, director, genre, year, etc.) using database information")
@@ -147,7 +160,7 @@ def create_agent(api_key):
         llm=llm,
         agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
         memory=memory,
-        verbose=False,
+        verbose=True,
         handle_parsing_errors=True
     )
 
