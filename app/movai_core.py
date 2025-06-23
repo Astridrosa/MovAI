@@ -62,7 +62,22 @@ def rag_search_movies(api_key, query):
     docs = retriever.get_relevant_documents(query)
     if not docs:
         return "No relevant information found."
-    return "\n\n".join([doc.page_content for doc in docs[:5]])
+        context = "\n\n".join([doc.page_content for doc in docs[:5]])
+    prompt = f"""You are a helpful movie expert AI.
+
+Use the following context to answer the user's question:
+{context}
+
+Question: {query}
+Answer:"""
+
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        google_api_key=api_key,
+        temperature=0.5
+    )
+
+    return llm.predict(prompt)
 
 # --- Tool Functions ---
 
