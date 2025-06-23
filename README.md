@@ -1,4 +1,4 @@
-# 🎬 MovieAI 
+# 🎬 MovAI 
 This project was built as a Final Project for DS/AI Class – Agentic Chatbot with Langchain-style Architecture
 
 # 📌 Short Description
@@ -8,10 +8,10 @@ MovAI is an intelligent movie chatbot powered by a Large Language Model (Google 
 Follow the steps below to run the chatbot locally on your computer:
 
 **1. Clone the Repository**
-Start by cloning or downloading this repository using the following command in your terminal: `git clone https://github.com/Astridrosa/MovieAI.git`
+Start by cloning or downloading this repository using the following command in your terminal: `git clone https://github.com/Astridrosa/MovAI.git`
 
 **2. Open the Project in Your Editor or Terminal**
-Once cloned, open the `MovieAI` folder using an editor such as Visual Studio Code, or open a terminal in that folder to easily run the files.
+Once cloned, open the `MovAI` folder using an editor such as Visual Studio Code, or open a terminal in that folder to easily run the files.
 
 **3. Install Required Dependencies**
 Make sure your Python environment includes all the necessary libraries. Install them with:
