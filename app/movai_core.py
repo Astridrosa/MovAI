@@ -42,7 +42,7 @@ def search_movie(title):
     result = df[df['movie_name_clean'].str.contains(title, na=False)]
     return result[['movie_name', 'genre', 'director']].head(3).to_string(index=False) if not result.empty else f"Movie '{title}' not found."
 
-# Recommend top 5 movies based on genre
+# Recommend movies based on genre
 def recommend_movies_by_genre(genre):
     genre = genre.lower()
     result = df[df['genre_list'].apply(lambda genres: genre in genres)]
@@ -91,7 +91,12 @@ def get_vectorstore(api_key):
     # Convert dataset rows into vectorized documents using Gemini Embeddings
     docs = []
     for _, row in df.iterrows():
-        content = f"Title: {row['movie_name']}\nGenre: {row['genre']}\nDirector: {row['director']}\nCast: {row['cast']}"
+        content = f"""Title: {row['movie_name']}
+    Genre: {row['genre']}
+    Director: {row['director']}
+    Cast: {row['cast']}
+    Year: {row['year']}
+    """
         docs.append(Document(page_content=content))
 
     splitter = CharacterTextSplitter(chunk_size=300, chunk_overlap=30)
@@ -127,13 +132,13 @@ def create_agent(api_key):
         return rag_search_movies(api_key, query)
 
     tools = [
+        Tool(name="RAGSearch", func=rag_tool_func, description="Answer any movie-related question (title, actor, director, genre, year, etc.) using database information")
         Tool(name="SearchMovie", func=search_movie, description="Search movie by title"),
         Tool(name="RecommendByGenre", func=recommend_movies_by_genre, description="Recommend movies based on genre"),
         Tool(name="MoviesByYear", func=get_movies_by_year, description="Find movies from a specific year"),
         Tool(name="DirectorMovies", func=get_director_movies, description="Find all movies by a specific director"),
         Tool(name="ActorMovies", func=get_movies_by_actor, description="Find movies with a specific actor"),
         Tool(name="RecommendByMood", func=recommend_movies_by_mood, description="Recommend movies based on mood (happy, sad, excited, etc.)"),
-        Tool(name="RAGSearch", func=rag_tool_func, description="Search for movie-related information using RAG from dataset (title, actor, director, etc.)")
     ]
 
     memory = ConversationBufferMemory(memory_key="chat_history")
