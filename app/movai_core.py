@@ -8,6 +8,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.schema import Document
+from langchain.agents.agent_types import AgentType
 
 # === Load and preprocess the dataset ===
 
@@ -140,7 +141,7 @@ def create_agent(api_key):
     agent = initialize_agent(
         tools=tools,
         llm=llm,
-        agent="zero-shot-react-description",
+        agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
         memory=memory,
         verbose=False,
         handle_parsing_errors=True
