@@ -34,6 +34,36 @@ def load_data():
 
 df = load_data()
 
+# === RAG ===
+def get_vectorstore(api_key):
+    docs = []
+    for _, row in df.iterrows():
+        content = f"""Title: {row['movie_name']}
+Genre: {row['genre']}
+Director: {row['director']}
+Cast: {row['cast']}
+Year: {row['year']}"""
+        docs.append(Document(page_content=content))
+
+    splitter = CharacterTextSplitter(chunk_size=300, chunk_overlap=30)
+    texts = splitter.split_documents(docs)
+
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="models/embedding-001",
+        google_api_key=api_key
+    )
+
+    vectorstore = FAISS.from_documents(texts, embeddings)
+    return vectorstore
+
+def rag_search_movies(api_key, query):
+    vectorstore = get_vectorstore(api_key)
+    retriever = vectorstore.as_retriever()
+    docs = retriever.get_relevant_documents(query)
+    if not docs:
+        return "No relevant information found."
+    return "\n\n".join([doc.page_content for doc in docs[:5]])
+
 # --- Tool Functions ---
 
 # Search for a movie by title
@@ -85,42 +115,12 @@ def recommend_movies_by_mood(mood):
     else:
         return f"Sorry, I don't recognize the mood '{mood}'. Try: happy, sad, excited, romantic, scary, thrilling."
 
-# === RAG Tool (Retrieval-Augmented Generation) ===
-# Bonus feature: vector similarity search using FAISS and Gemini Embeddings
-def get_vectorstore(api_key):
-    # Convert dataset rows into vectorized documents using Gemini Embeddings
-    docs = []
-    for _, row in df.iterrows():
-        content = f"""Title: {row['movie_name']}
-    Genre: {row['genre']}
-    Director: {row['director']}
-    Cast: {row['cast']}
-    Year: {row['year']}
-    """
-        docs.append(Document(page_content=content))
-
-    splitter = CharacterTextSplitter(chunk_size=300, chunk_overlap=30)
-    texts = splitter.split_documents(docs)
-
-    embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/embedding-001",         
-    google_api_key=api_key                
-)
-    vectorstore = FAISS.from_documents(texts, embeddings)
-    return vectorstore
-
-def rag_search_movies(api_key, query):
-    # Use vector search to retrieve top matching movie entries
-    vectorstore = get_vectorstore(api_key)
-    retriever = vectorstore.as_retriever()
-    docs = retriever.get_relevant_documents(query)
-    if not docs:
-        return "No relevant information found."
-    return "\n\n".join([doc.page_content for doc in docs[:5]])
-
 # === Agent Creation ===
 # Combine LLM, memory, and tools into a Langchain agent
 def create_agent(api_key):
+    global memory
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=False)
+
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash",
         google_api_key=api_key,
@@ -129,6 +129,8 @@ def create_agent(api_key):
 
     # Wrap RAG tool to pass the API key dynamically
     def rag_tool_func(query):
+        chat_history = memory.load_memory_variables({}).get("chat_history", "")
+        full_query = f"{chat_history}\n\nUser: {query}"
         return rag_search_movies(api_key, query)
 
     tools = [
@@ -140,9 +142,6 @@ def create_agent(api_key):
         Tool(name="ActorMovies", func=get_movies_by_actor, description="Find movies with a specific actor"),
         Tool(name="RecommendByMood", func=recommend_movies_by_mood, description="Recommend movies based on mood (happy, sad, excited, etc.)"),
     ]
-
-    memory = ConversationBufferMemory(memory_key="chat_history")
-
     agent = initialize_agent(
         tools=tools,
         llm=llm,
