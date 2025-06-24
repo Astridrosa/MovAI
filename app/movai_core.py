@@ -1,6 +1,3 @@
-# Reset seluruh state agar agent lama dibuang
-st.session_state.clear()
-
 # === Imports =================================================================
 import ast
 import pandas as pd
