@@ -13,9 +13,7 @@ if "chat_ui" not in st.session_state:
     st.session_state.chat_ui = []
 
 # ── Rebuild the agent whenever the API key CHANGES ────────────────────────────
-key_changed = api_key and api_key != st.session_state.get("saved_api_key")
-
-if key_changed:
+if api_key and api_key != st.session_state.get("saved_api_key"):
     st.session_state.saved_api_key = api_key
     st.session_state.agent = create_agent(api_key)
 
