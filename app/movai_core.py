@@ -143,18 +143,17 @@ def create_agent(api_key):
         history = memory_vars.get("chat_history", "")
 
         formatted = "Conversation History:\n"
-        for turn in history.split("\n"):
-            if "Human:" in turn:
-                formatted += f"User: {turn.split('Human:')[-1].strip()}\n"
-            elif "AI:" in turn:
-                formatted += f"Assistant: {turn.split('AI:')[-1].strip()}\n"
+    for msg in history:
+        if hasattr(msg, "type") and hasattr(msg, "content"):
+            role = "User" if msg.type == "human" else "Assistant"
+            formatted += f"{role}: {msg.content}\n"
 
-        full_query = f"""{formatted}
+    full_query = f"""{formatted}
 
 Current question: {query}
 Use the conversation above to answer accurately."""
 
-        return rag_search_movies(api_key, full_query)
+    return rag_search_movies(api_key, full_query)
 
     tools = [
         Tool(name="RAGSearch", func=rag_tool_func, description="Answer any movie-related question (title, actor, director, genre, year, etc.) using database information"),
