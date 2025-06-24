@@ -171,7 +171,7 @@ def create_agent(api_key: str):
 
 # === Cara pakai ===============================================================
 if __name__ == "__main__":
-    GOOGLE_API_KEY = "YOUR_API_KEY_HERE"          # ganti dengan milikmu
+    GOOGLE_API_KEY = "AIzaSyDJGE4d17YEwnhORZ7VxgmKe1Mt04voc6U"          # ganti dengan milikmu
     moviebot = create_agent(GOOGLE_API_KEY)
 
     # panggil agent – CUKUP kirim field 'input'
