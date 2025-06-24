@@ -1,5 +1,5 @@
 import streamlit as st
-from movai_core import create_agent
+from app.movai_core import create_agent
 
 st.set_page_config(page_title="🎬 MovAI - Your Movie Chatbot")
 st.title("🎬 MovAI - MovieBot")
@@ -13,9 +13,7 @@ if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = []
 
 if "agent" not in st.session_state:
-     st.session_state.agent = create_agent(api_key)
-
-response = st.session_state.agent.run(user_input)
+     st.session_state.agent = create_agent(google_api_key)
 
 # === Setup agent only after API key provided ===
 if not google_api_key:
