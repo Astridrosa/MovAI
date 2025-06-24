@@ -168,8 +168,22 @@ def create_agent(api_key: str):
     print("✅ MEMORY CHECK:", memory.load_memory_variables({}))
     return agent
 
-agent = create_agent(YOUR_API_KEY)
-response = agent.invoke({
-    "input": "Rekomendasikan film action tahun 2010-an"
-})
-print(response["output"])
+if __name__ == "__main__":
+    import inspect
+
+    API_KEY = "YOUR_API_KEY_HERE"
+    agent = create_agent(API_KEY)
+
+    print("=== DEBUG CEK ===")
+    print("Memory vars:", agent.memory.load_memory_variables({}))
+    print("Agent expects input keys:", inspect.signature(agent.invoke).parameters)
+
+    # Simulasi input aman
+    try:
+        response = agent.invoke({
+            "input": "Rekomendasikan film action tahun 2010-an"
+        })
+        print("Bot:", response["output"])
+    except Exception as e:
+        print("❌ ERROR SAAT INVOKE:")
+        print(type(e).__name__, ":", e)
