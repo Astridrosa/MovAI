@@ -25,7 +25,8 @@ def _clean_genre(x: str):
     return []
 
 def load_data() -> pd.DataFrame:
-    df = pd.read_csv("data/IMDB_Movie.csv")
+    url = "https://raw.githubusercontent.com/Astridrosa/MovAI/refs/heads/master/data/IMDB_Movie.csv"
+    df = pd.read_csv(url)
     df["genre_list"]       = df["genre"].apply(_clean_genre)
     df["movie_name_clean"] = df["movie_name"].fillna("").str.lower()
     df["director_clean"]   = df["director"].fillna("").str.lower()
