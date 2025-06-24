@@ -132,6 +132,12 @@ def create_agent(api_key):
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash", google_api_key=api_key, temperature=0.7
     )
+    def rag_tool_func(query):
+        return "Dummy response for now."  # atau panggil rag_search_movies(api_key, query)
+
+    tools = [
+        Tool(name="AskDB", func=rag_tool_func, description="Test RAG tool.")
+    ]
 
     tools = [
         Tool("AskDB",   lambda q: _rag_answer(api_key, q),
@@ -144,7 +150,7 @@ def create_agent(api_key):
         Tool("Mood",    recommend_mood,    "Recommend movies by mood."),
     ]
 
-    agent = initialize_agent(
+    return initialize_agent(
         tools, llm,
         agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
         memory=memory,
@@ -152,4 +158,6 @@ def create_agent(api_key):
         handle_parsing_errors=True,
     )
 
-    return agent
+print("✅ MEMORY CHECK:", memory.load_memory_variables({}))
+
+return agent
