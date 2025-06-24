@@ -1,27 +1,30 @@
-# === Imports =================================================================
 import ast
 import pandas as pd
 from functools import lru_cache
 
-from langchain.agents import Tool, initialize_agent
-from langchain.agents.agent_types import AgentType
+from langchain.agents import Tool, initialize_agent, AgentType
 from langchain.memory import ConversationBufferMemory
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_google_genai import (
+    ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings,
+)
 from langchain.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.schema import Document
 
-# === Data loading & cleaning ==================================================
+# ──────────────────────────────────────────────────────────
+# 1.  LOAD & CLEAN DATA
+# ──────────────────────────────────────────────────────────
 def _clean_genre(x: str):
     if pd.isna(x) or not isinstance(x, str):
         return []
     try:
-        genres = ast.literal_eval(x)
+        genres = ast.literal_eval(x)        # coba parsing list Python
         if isinstance(genres, list):
             return [g.strip().lower() for g in genres if isinstance(g, str)]
     except Exception:
-        return [g.strip().lower() for g in x.split(",")]
-    return []
+        pass
+    # fallback: split string biasa
+    return [g.strip().lower() for g in x.split(",")]
 
 def load_data() -> pd.DataFrame:
     url = (
@@ -37,7 +40,9 @@ def load_data() -> pd.DataFrame:
 
 DF = load_data()
 
-# === Vector store (cached per-API-key) =======================================
+# ──────────────────────────────────────────────────────────
+# 2.  VECTORSTORE (RAG)  ─ cache per API-key
+# ──────────────────────────────────────────────────────────
 @lru_cache(maxsize=3)
 def _vectorstore(api_key: str):
     docs = [
@@ -63,7 +68,7 @@ def _vectorstore(api_key: str):
 
 def _rag_answer(api_key: str, question: str) -> str:
     retriever = _vectorstore(api_key).as_retriever()
-    docs      = retriever.get_relevant_documents(question)
+    docs = retriever.get_relevant_documents(question)
     if not docs:
         return "Sorry, I couldn't find relevant information."
 
@@ -73,13 +78,14 @@ def _rag_answer(api_key: str, question: str) -> str:
         f"Context:\n{context}\n\n"
         f"Question: {question}\nAnswer:"
     )
-
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash", google_api_key=api_key, temperature=0.5
     )
     return llm.predict(prompt)
 
-# === Simple Data-frame helpers ===============================================
+# ──────────────────────────────────────────────────────────
+# 3.  DATAFRAME HELPER FUNCTIONS (Tools)
+# ──────────────────────────────────────────────────────────
 def search_movie(title: str):
     m = DF[DF.movie_name_clean.str.contains(title.strip().lower(), na=False)]
     return (
@@ -127,34 +133,33 @@ def recommend_mood(mood: str):
     g = mood_map.get(mood.lower())
     return recommend_genre(g) if g else "Mood not recognised."
 
-# === Agent factory ============================================================
+# ──────────────────────────────────────────────────────────
+# 4.  AGENT FACTORY
+# ──────────────────────────────────────────────────────────
 def create_agent(api_key: str):
-    # 1. Memory – chat_history disimpan otomatis oleh LangChain
+    # a) memory menyimpan list[BaseMessage] otomatis
     memory = ConversationBufferMemory(
-        memory_key="chat_history", return_messages=True
+        memory_key="chat_history",
+        return_messages=True
     )
-
-    # 2. LLM
+    # b) LLM
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash", google_api_key=api_key, temperature=0.7
+        model="gemini-1.5-flash",
+        google_api_key=api_key,
+        temperature=0.7,
     )
-
-    # 3. Tools
+    # c) tools
     tools = [
-        Tool(
-            name="AskDB",
-            func=lambda q: _rag_answer(api_key, q),
-            description="Free-form movie questions via database search.",
-        ),
-        Tool("Search",  search_movie,      "Find a movie by title."),
-        Tool("Genre",   recommend_genre,   "Recommend movies by genre."),
-        Tool("Year",    movies_by_year,    "Find movies from a specific year."),
-        Tool("Director",director_movies,   "Find movies by director."),
-        Tool("Actor",   actor_movies,      "Find movies with a given actor."),
-        Tool("Mood",    recommend_mood,    "Recommend movies by mood."),
+        Tool("AskDB",   lambda q: _rag_answer(api_key, q),
+             "Free-form movie questions via database search."),
+        Tool("Search",  search_movie,     "Find a movie by title."),
+        Tool("Genre",   recommend_genre,  "Recommend movies by genre."),
+        Tool("Year",    movies_by_year,   "Find movies from a specific year."),
+        Tool("Director",director_movies,  "Find movies by director."),
+        Tool("Actor",   actor_movies,     "Find movies with a given actor."),
+        Tool("Mood",    recommend_mood,   "Recommend movies by mood."),
     ]
-
-    # 4. Initialize conversational agent
+    # d) agent
     agent = initialize_agent(
         tools=tools,
         llm=llm,
@@ -163,19 +168,19 @@ def create_agent(api_key: str):
         verbose=False,
         handle_parsing_errors=True,
     )
-
-    # (opsional) cek isi memori kosong
-    print("✅ MEMORY CHECK:", memory.load_memory_variables({}))
     return agent
 
-
-# === Cara pakai ===============================================================
+# ──────────────────────────────────────────────────────────
+# 5.  DEMO / MAIN
+# ──────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    GOOGLE_API_KEY = "AIzaSyDJGE4d17YEwnhORZ7VxgmKe1Mt04voc6U"          # ganti dengan milikmu
-    moviebot = create_agent(GOOGLE_API_KEY)
+    GOOGLE_API_KEY = "YOUR_API_KEY_HERE"          # ← ganti punyamu
+    bot = create_agent(GOOGLE_API_KEY)
 
-    # panggil agent – CUKUP kirim field 'input'
-    reply = moviebot.invoke({
-        "input": "Rekomendasikan film action era 2010-an dong!"
-    })
-    print("🎬 BOT:", reply["output"])
+    print("\nMovieBot siap!  (ketik 'exit' untuk keluar)\n")
+    while True:
+        user = input("You : ")
+        if user.strip().lower() in {"exit", "quit"}:
+            break
+        res = bot.invoke({"input": user})   # ⚠️ hanya field 'input'
+        print("Bot :", res["output"])
