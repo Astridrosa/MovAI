@@ -2,7 +2,6 @@
 import pandas as pd
 import ast
 from langchain.agents import Tool, initialize_agent
-from langchain.memory import ConversationBufferMemory
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain.vectorstores import FAISS
@@ -128,7 +127,8 @@ def recommend_movies_by_mood(mood):
 
 # === Agent Creation ===
 def create_agent(api_key):
-    global memory
+    from langchain.memory import ConversationBufferMemory
+    
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
     llm = ChatGoogleGenerativeAI(
