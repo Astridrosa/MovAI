@@ -126,9 +126,9 @@ def recommend_movies_by_mood(mood):
         return f"Sorry, I don't recognize the mood '{mood}'. Try: happy, sad, excited, romantic, scary, thrilling."
 
 # === Agent Creation ===
+from langchain.schema import BaseMessage  # untuk validasi memory jika perlu
+
 def create_agent(api_key):
-    from langchain.memory import ConversationBufferMemory
-    
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
     llm = ChatGoogleGenerativeAI(
@@ -137,18 +137,17 @@ def create_agent(api_key):
         temperature=0.7
     )
 
-    # Function RAG to acces memory
     def rag_tool_func(query):
         return rag_search_movies(api_key, query)
 
     tools = [
-        Tool(name="RAGSearch", func=rag_tool_func, description="Answer any movie-related question (title, actor, director, genre, year, etc.) using database information"),
-        Tool(name="SearchMovie", func=search_movie, description="Search movie by title"),
-        Tool(name="RecommendByGenre", func=recommend_movies_by_genre, description="Recommend movies based on genre"),
-        Tool(name="MoviesByYear", func=get_movies_by_year, description="Find movies from a specific year"),
-        Tool(name="DirectorMovies", func=get_director_movies, description="Find all movies by a specific director"),
-        Tool(name="ActorMovies", func=get_movies_by_actor, description="Find movies with a specific actor"),
-        Tool(name="RecommendByMood", func=recommend_movies_by_mood, description="Recommend movies based on mood (happy, sad, excited, etc.)"),
+        Tool(name="RAGSearch", func=rag_tool_func, description="Jawab pertanyaan film menggunakan database."),
+        Tool(name="SearchMovie", func=search_movie, description="Cari film berdasarkan judul."),
+        Tool(name="RecommendByGenre", func=recommend_movies_by_genre, description="Rekomendasi film berdasarkan genre."),
+        Tool(name="MoviesByYear", func=get_movies_by_year, description="Cari film dari tahun tertentu."),
+        Tool(name="DirectorMovies", func=get_director_movies, description="Cari film dari sutradara tertentu."),
+        Tool(name="ActorMovies", func=get_movies_by_actor, description="Cari film berdasarkan aktor."),
+        Tool(name="RecommendByMood", func=recommend_movies_by_mood, description="Rekomendasi film berdasarkan suasana hati."),
     ]
 
     agent = initialize_agent(
