@@ -22,7 +22,7 @@ def clean_genre(x):
     except:
         return [g.strip().lower() for g in x.split(',')]
     return []
-    
+
 def load_data():
     url = "https://raw.githubusercontent.com/Astridrosa/MovieAI/main/IMDB_Movie.csv"
     df = pd.read_csv(url)
@@ -60,9 +60,12 @@ def rag_search_movies(api_key, query):
     vectorstore = get_vectorstore(api_key)
     retriever = vectorstore.as_retriever()
     docs = retriever.get_relevant_documents(query)
+    
     if not docs:
         return "No relevant information found."
-        context = "\n\n".join([doc.page_content for doc in docs[:5]])
+
+    context = "\n\n".join([doc.page_content for doc in docs[:5]])
+
     prompt = f"""You are a helpful movie expert AI.
 
 Use the following context to answer the user's question:
@@ -80,20 +83,16 @@ Answer:"""
     return llm.predict(prompt)
 
 # --- Tool Functions ---
-
-# Search for a movie by title
 def search_movie(title):
     title = title.strip().lower()
     result = df[df['movie_name_clean'].str.contains(title, na=False)]
     return result[['movie_name', 'genre', 'director']].head(3).to_string(index=False) if not result.empty else f"Movie '{title}' not found."
 
-# Recommend movies based on genre
 def recommend_movies_by_genre(genre):
     genre = genre.lower()
     result = df[df['genre_list'].apply(lambda genres: genre in genres)]
     return result[['movie_name', 'genre']].head().to_string(index=False) if not result.empty else "No genre match found."
 
-# Find movies released in a specific year
 def get_movies_by_year(year):
     try:
         year = int(year)
@@ -102,19 +101,16 @@ def get_movies_by_year(year):
     result = df[df['year'] == year]
     return result[['movie_name', 'year']].head(5).to_string(index=False) if not result.empty else "No movies found for that year."
 
-# Find movies by a specific director
 def get_director_movies(name):
     name = name.strip().lower()
     result = df[df['director_clean'].str.contains(name)]
     return result[['movie_name', 'director']].head(5).to_string(index=False) if not result.empty else f"No movies found by director '{name}'."
 
-# Find movies that include a specific actor
 def get_movies_by_actor(actor_name):
     actor_name = actor_name.strip().lower()
     result = df[df['cast_clean'].str.contains(actor_name, na=False)]
     return result[['movie_name', 'cast']].head(5).to_string(index=False) if not result.empty else f"No movies found with actor '{actor_name}'."
 
-# Map user mood to a genre and return recommendations
 def recommend_movies_by_mood(mood):
     mood_map = {
         "happy": "comedy",
@@ -131,7 +127,6 @@ def recommend_movies_by_mood(mood):
         return f"Sorry, I don't recognize the mood '{mood}'. Try: happy, sad, excited, romantic, scary, thrilling."
 
 # === Agent Creation ===
-# Combine LLM, memory, and tools into a Langchain agent
 def create_agent(api_key):
     global memory
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=False)
@@ -142,11 +137,11 @@ def create_agent(api_key):
         temperature=0.7
     )
 
-    # Wrap RAG tool to pass the API key dynamically
-def rag_tool_func(query):
+    # Function RAG to acces memory
+    def rag_tool_func(query):
         memory_vars = memory.load_memory_variables({})
         history = memory_vars.get("chat_history", "")
-        
+
         formatted = "Conversation History:\n"
         for turn in history.split("\n"):
             if "Human:" in turn:
@@ -158,11 +153,11 @@ def rag_tool_func(query):
 
 Current question: {query}
 Use the conversation above to answer accurately."""
-        
+
         return rag_search_movies(api_key, full_query)
 
     tools = [
-        Tool(name="RAGSearch", func=rag_tool_func, description="Answer any movie-related question (title, actor, director, genre, year, etc.) using database information")
+        Tool(name="RAGSearch", func=rag_tool_func, description="Answer any movie-related question (title, actor, director, genre, year, etc.) using database information"),
         Tool(name="SearchMovie", func=search_movie, description="Search movie by title"),
         Tool(name="RecommendByGenre", func=recommend_movies_by_genre, description="Recommend movies based on genre"),
         Tool(name="MoviesByYear", func=get_movies_by_year, description="Find movies from a specific year"),
@@ -170,6 +165,7 @@ Use the conversation above to answer accurately."""
         Tool(name="ActorMovies", func=get_movies_by_actor, description="Find movies with a specific actor"),
         Tool(name="RecommendByMood", func=recommend_movies_by_mood, description="Recommend movies based on mood (happy, sad, excited, etc.)"),
     ]
+
     agent = initialize_agent(
         tools=tools,
         llm=llm,
