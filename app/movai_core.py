@@ -124,9 +124,9 @@ def recommend_mood(mood: str):
     return recommend_genre(g) if g else "Mood not recognised."
 
 # === Agent factory ============================================================
-def create_agent(api_key: str):
+def create_agent(api_key):
     memory = ConversationBufferMemory(
-        memory_key="chat_history", return_messages=True  # <- format terjamin
+        memory_key="chat_history", return_messages=True
     )
 
     llm = ChatGoogleGenerativeAI(
@@ -157,3 +157,7 @@ def create_agent(api_key: str):
         verbose=False,
         handle_parsing_errors=True,
     )
+
+print("✅ MEMORY CHECK:", memory.load_memory_variables({}))
+
+return agent
