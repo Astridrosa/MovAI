@@ -1,7 +1,9 @@
 import streamlit as st
-from app.movai_core import create_agent
+from movai.movai_core import create_agent   
 
 st.set_page_config(page_title="🎬 MovAI - Your Movie Chatbot")
+# ... sisanya tetap ...
+
 st.title("🎬 MovAI - MovieBot")
 st.markdown("Ask anything about movies")
 
