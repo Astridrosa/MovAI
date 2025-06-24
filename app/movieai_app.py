@@ -1,5 +1,5 @@
 import streamlit as st
-from movai.movai_core import create_agent   
+from app.movai_core import create_agent   
 
 st.set_page_config(page_title="🎬 MovAI - Your Movie Chatbot")
 st.title("🎬 MovAI - MovieBot")
