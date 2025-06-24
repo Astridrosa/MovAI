@@ -1,13 +1,15 @@
 # === Import Libraries ===
 import pandas as pd
 import ast
+
 from langchain.agents import Tool, initialize_agent
+from langchain.agents.agent_types import AgentType
+from langchain.memory import ConversationBufferMemory 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.schema import Document
-from langchain.agents.agent_types import AgentType
 
 # === Load and preprocess the dataset ===
 
@@ -33,130 +35,118 @@ def load_data():
 
 df = load_data()
 
-# === RAG ===
-def get_vectorstore(api_key):
-    docs = []
-    for _, row in df.iterrows():
-        content = f"""Title: {row['movie_name']}
-Genre: {row['genre']}
-Director: {row['director']}
-Cast: {row['cast']}
-Year: {row['year']}"""
-        docs.append(Document(page_content=content))
+# === RAG helpers === ----------------------------------------------------------
+def _build_vectorstore(api_key: str):
+    docs = [
+        Document(
+            page_content=(
+                f"Title: {row.movie_name}\nGenre: {row.genre}\n"
+                f"Director: {row.director}\nCast: {row.cast}\nYear: {row.year}"
+            )
+        )
+        for _, row in df.iterrows()
+    ]
 
-    splitter = CharacterTextSplitter(chunk_size=300, chunk_overlap=30)
-    texts = splitter.split_documents(docs)
-
+    texts = CharacterTextSplitter(chunk_size=300, chunk_overlap=30).split_documents(docs)
     embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001",
-        google_api_key=api_key
+        model="models/embedding-001", google_api_key=api_key
     )
+    return FAISS.from_documents(texts, embeddings)
 
-    vectorstore = FAISS.from_documents(texts, embeddings)
-    return vectorstore
-
-def rag_search_movies(api_key, query):
-    vectorstore = get_vectorstore(api_key)
-    retriever = vectorstore.as_retriever()
+def rag_search(api_key: str, query: str) -> str:
+    retriever = _build_vectorstore(api_key).as_retriever()
     docs = retriever.get_relevant_documents(query)
-    
+
     if not docs:
         return "No relevant information found."
 
-    context = "\n\n".join([doc.page_content for doc in docs[:5]])
-
-    prompt = f"""You are a helpful movie expert AI.
-
-Use the following context to answer the user's question:
-{context}
-
-Question: {query}
-Answer:"""
-
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
-        google_api_key=api_key,
-        temperature=0.5
+    context = "\n\n".join(doc.page_content for doc in docs[:5])
+    prompt = (
+        "You are a helpful movie expert AI.\n\n"
+        f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
     )
 
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash", google_api_key=api_key, temperature=0.5
+    )
     return llm.predict(prompt)
 
-# --- Tool Functions ---
-def search_movie(title):
-    title = title.strip().lower()
-    result = df[df['movie_name_clean'].str.contains(title, na=False)]
-    return result[['movie_name', 'genre', 'director']].head(3).to_string(index=False) if not result.empty else f"Movie '{title}' not found."
+# === Simple search/recommend functions (non-LLM) =============================
+def search_movie(title: str):
+    m = df[df.movie_name_clean.str.contains(title.strip().lower(), na=False)]
+    return (
+        m[["movie_name", "genre", "director"]].head(3).to_string(index=False)
+        if not m.empty else f"Movie '{title}' not found."
+    )
 
-def recommend_movies_by_genre(genre):
-    genre = genre.lower()
-    result = df[df['genre_list'].apply(lambda genres: genre in genres)]
-    return result[['movie_name', 'genre']].head().to_string(index=False) if not result.empty else "No genre match found."
+def recommend_by_genre(genre: str):
+    m = df[df.genre_list.apply(lambda gs: genre.lower() in gs)]
+    return (
+        m[["movie_name", "genre"]].head().to_string(index=False)
+        if not m.empty else "No genre match found."
+    )
 
-def get_movies_by_year(year):
+def movies_by_year(year: str):
     try:
-        year = int(year)
-    except:
+        y = int(year)
+    except ValueError:
         return "Invalid year format."
-    result = df[df['year'] == year]
-    return result[['movie_name', 'year']].head(5).to_string(index=False) if not result.empty else "No movies found for that year."
+    m = df[df.year == y]
+    return (
+        m[["movie_name", "year"]].head(5).to_string(index=False)
+        if not m.empty else f"No movies from {year}."
+    )
 
-def get_director_movies(name):
-    name = name.strip().lower()
-    result = df[df['director_clean'].str.contains(name)]
-    return result[['movie_name', 'director']].head(5).to_string(index=False) if not result.empty else f"No movies found by director '{name}'."
+def director_movies(name: str):
+    m = df[df.director_clean.str.contains(name.strip().lower(), na=False)]
+    return (
+        m[["movie_name", "director"]].head(5).to_string(index=False)
+        if not m.empty else f"No movies by director '{name}'."
+    )
 
-def get_movies_by_actor(actor_name):
-    actor_name = actor_name.strip().lower()
-    result = df[df['cast_clean'].str.contains(actor_name, na=False)]
-    return result[['movie_name', 'cast']].head(5).to_string(index=False) if not result.empty else f"No movies found with actor '{actor_name}'."
+def actor_movies(actor: str):
+    m = df[df.cast_clean.str.contains(actor.strip().lower(), na=False)]
+    return (
+        m[["movie_name", "cast"]].head(5).to_string(index=False)
+        if not m.empty else f"No movies with actor '{actor}'."
+    )
 
-def recommend_movies_by_mood(mood):
+def recommend_by_mood(mood: str):
     mood_map = {
-        "happy": "comedy",
-        "sad": "drama",
-        "excited": "action",
-        "romantic": "romance",
-        "scary": "horror",
-        "thrilling": "thriller"
+        "happy": "comedy", "sad": "drama", "excited": "action",
+        "romantic": "romance", "scary": "horror", "thrilling": "thriller",
     }
     genre = mood_map.get(mood.lower())
-    if genre:
-        return recommend_movies_by_genre(genre)
-    else:
-        return f"Sorry, I don't recognize the mood '{mood}'. Try: happy, sad, excited, romantic, scary, thrilling."
+    return (
+        recommend_by_genre(genre)
+        if genre else f"Unrecognised mood '{mood}'."
+    )
 
-# === Agent Creation ===
-from langchain.schema import BaseMessage  # untuk validasi memory jika perlu
-
-def create_agent(api_key):
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+# === Agent factory ============================================================
+def create_agent(api_key: str):
+    memory = ConversationBufferMemory(
+        memory_key="chat_history", return_messages=True  # <-- kunci agar list BaseMessage
+    )
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
-        google_api_key=api_key,
-        temperature=0.7
+        model="gemini-1.5-flash", google_api_key=api_key, temperature=0.7
     )
-
-    def rag_tool_func(query):
-        return rag_search_movies(api_key, query)
 
     tools = [
-        Tool(name="RAGSearch", func=rag_tool_func, description="Jawab pertanyaan film menggunakan database."),
-        Tool(name="SearchMovie", func=search_movie, description="Cari film berdasarkan judul."),
-        Tool(name="RecommendByGenre", func=recommend_movies_by_genre, description="Rekomendasi film berdasarkan genre."),
-        Tool(name="MoviesByYear", func=get_movies_by_year, description="Cari film dari tahun tertentu."),
-        Tool(name="DirectorMovies", func=get_director_movies, description="Cari film dari sutradara tertentu."),
-        Tool(name="ActorMovies", func=get_movies_by_actor, description="Cari film berdasarkan aktor."),
-        Tool(name="RecommendByMood", func=recommend_movies_by_mood, description="Rekomendasi film berdasarkan suasana hati."),
+        Tool("RAGSearch",      lambda q: rag_search(api_key, q),
+             "Answer any movie-related question using the database."),
+        Tool("SearchMovie",      search_movie,      "Find a movie by title."),
+        Tool("RecommendGenre",   recommend_by_genre, "Recommend movies by genre."),
+        Tool("MoviesByYear",     movies_by_year,     "Find movies from a given year."),
+        Tool("DirectorMovies",   director_movies,    "Find movies by a director."),
+        Tool("ActorMovies",      actor_movies,       "Find movies featuring an actor."),
+        Tool("RecommendMood",    recommend_by_mood,  "Recommend movies by mood."),
     ]
 
-    agent = initialize_agent(
-        tools=tools,
-        llm=llm,
+    return initialize_agent(
+        tools, llm,
         agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
         memory=memory,
-        verbose=True,
-        handle_parsing_errors=True
+        verbose=False,
+        handle_parsing_errors=True,
     )
-
-    return agent
