@@ -167,3 +167,9 @@ def create_agent(api_key: str):
     # (opsional) cek isi memori kosong
     print("✅ MEMORY CHECK:", memory.load_memory_variables({}))
     return agent
+
+agent = create_agent(YOUR_API_KEY)
+response = agent.invoke({
+    "input": "Rekomendasikan film action tahun 2010-an"
+})
+print(response["output"])
