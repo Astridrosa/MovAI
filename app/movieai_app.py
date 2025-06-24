@@ -1,5 +1,6 @@
 import streamlit as st
 from app.movai_core import create_agent
+
 st.set_page_config(page_title="🎬 MovAI - Your Movie Chatbot")
 st.title("🎬 MovAI - MovieBot")
 st.markdown("Ask anything about movies")
@@ -12,7 +13,7 @@ if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = []
 
 if "agent" not in st.session_state:
-     st.session_state.agent = create_agent(google_api_key)
+    st.session_state.agent = create_agent(google_api_key)
 
 # === Setup agent only after API key provided ===
 if not google_api_key:
@@ -37,15 +38,12 @@ user_input = st.chat_input("Type your message here...")
 
 # === On message input, run agent and display response ===
 if user_input and st.session_state.agent:
-    # Tampilkan pesan pengguna
     with st.chat_message("user"):
         st.markdown(user_input)
     st.session_state.chat_messages.append(("user", user_input))
 
-    # Buat input yang lebih bersahabat (opsional)
     friendly_input = f"{user_input}. Please answer simply and include a short follow-up."
 
-    # Jalankan agent dan tampilkan respons
     with st.chat_message("assistant"):
         with st.spinner("🎮 MovieBot is thinking..."):
             try:
