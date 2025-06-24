@@ -129,7 +129,7 @@ def recommend_movies_by_mood(mood):
 # === Agent Creation ===
 def create_agent(api_key):
     global memory
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=False)
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash",
@@ -139,21 +139,7 @@ def create_agent(api_key):
 
     # Function RAG to acces memory
     def rag_tool_func(query):
-        memory_vars = memory.load_memory_variables({})
-        history = memory_vars.get("chat_history", "")
-
-        formatted = "Conversation History:\n"
-    for msg in history:
-        if hasattr(msg, "type") and hasattr(msg, "content"):
-            role = "User" if msg.type == "human" else "Assistant"
-            formatted += f"{role}: {msg.content}\n"
-
-    full_query = f"""{formatted}
-
-Current question: {query}
-Use the conversation above to answer accurately."""
-
-    return rag_search_movies(api_key, full_query)
+        return rag_search_movies(api_key, query)
 
     tools = [
         Tool(name="RAGSearch", func=rag_tool_func, description="Answer any movie-related question (title, actor, director, genre, year, etc.) using database information"),
