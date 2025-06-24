@@ -6,8 +6,7 @@ from functools import lru_cache
 from langchain.agents import Tool, initialize_agent
 from langchain.agents.agent_types import AgentType
 from langchain.memory import ConversationBufferMemory
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.schema import Document
@@ -25,7 +24,10 @@ def _clean_genre(x: str):
     return []
 
 def load_data() -> pd.DataFrame:
-    url = "https://raw.githubusercontent.com/Astridrosa/MovAI/refs/heads/master/data/IMDB_Movie.csv"
+    url = (
+        "https://raw.githubusercontent.com/Astridrosa/MovAI/"
+        "refs/heads/master/data/IMDB_Movie.csv"
+    )
     df = pd.read_csv(url)
     df["genre_list"]       = df["genre"].apply(_clean_genre)
     df["movie_name_clean"] = df["movie_name"].fillna("").str.lower()
@@ -35,7 +37,7 @@ def load_data() -> pd.DataFrame:
 
 DF = load_data()
 
-# === Vector store (cached per API-key) ========================================
+# === Vector store (cached per-API-key) =======================================
 @lru_cache(maxsize=3)
 def _vectorstore(api_key: str):
     docs = [
@@ -50,11 +52,14 @@ def _vectorstore(api_key: str):
         )
         for _, row in DF.iterrows()
     ]
-    chunks = CharacterTextSplitter(chunk_size=300, chunk_overlap=30).split_documents(docs)
-    emb    = GoogleGenerativeAIEmbeddings(
+    chunks = CharacterTextSplitter(
+        chunk_size=300, chunk_overlap=30
+    ).split_documents(docs)
+
+    embeddings = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001", google_api_key=api_key
     )
-    return FAISS.from_documents(chunks, emb)
+    return FAISS.from_documents(chunks, embeddings)
 
 def _rag_answer(api_key: str, question: str) -> str:
     retriever = _vectorstore(api_key).as_retriever()
@@ -70,14 +75,12 @@ def _rag_answer(api_key: str, question: str) -> str:
     )
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
-        google_api_key=api_key,
-        temperature=0.5,
+        model="gemini-1.5-flash", google_api_key=api_key, temperature=0.5
     )
     return llm.predict(prompt)
 
-# === Simple Data-frame tools ==================================================
-def search_movie(title):
+# === Simple Data-frame helpers ===============================================
+def search_movie(title: str):
     m = DF[DF.movie_name_clean.str.contains(title.strip().lower(), na=False)]
     return (
         m[["movie_name", "genre", "director"]].head(3).to_string(index=False)
@@ -125,24 +128,24 @@ def recommend_mood(mood: str):
     return recommend_genre(g) if g else "Mood not recognised."
 
 # === Agent factory ============================================================
-def create_agent(api_key):
+def create_agent(api_key: str):
+    # 1. Memory – chat_history disimpan otomatis oleh LangChain
     memory = ConversationBufferMemory(
         memory_key="chat_history", return_messages=True
     )
 
+    # 2. LLM
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash", google_api_key=api_key, temperature=0.7
     )
-    def rag_tool_func(query):
-        return "Dummy response for now."  # atau panggil rag_search_movies(api_key, query)
 
+    # 3. Tools
     tools = [
-        Tool(name="AskDB", func=rag_tool_func, description="Test RAG tool.")
-    ]
-
-    tools = [
-        Tool("AskDB",   lambda q: _rag_answer(api_key, q),
-             "Free-form movie questions via database search."),
+        Tool(
+            name="AskDB",
+            func=lambda q: _rag_answer(api_key, q),
+            description="Free-form movie questions via database search.",
+        ),
         Tool("Search",  search_movie,      "Find a movie by title."),
         Tool("Genre",   recommend_genre,   "Recommend movies by genre."),
         Tool("Year",    movies_by_year,    "Find movies from a specific year."),
@@ -151,14 +154,28 @@ def create_agent(api_key):
         Tool("Mood",    recommend_mood,    "Recommend movies by mood."),
     ]
 
-    return initialize_agent(
-        tools, llm,
+    # 4. Initialize conversational agent
+    agent = initialize_agent(
+        tools=tools,
+        llm=llm,
         agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
         memory=memory,
         verbose=False,
         handle_parsing_errors=True,
     )
 
-print("✅ MEMORY CHECK:", memory.load_memory_variables({}))
+    # (opsional) cek isi memori kosong
+    print("✅ MEMORY CHECK:", memory.load_memory_variables({}))
+    return agent
 
-return agent
+
+# === Cara pakai ===============================================================
+if __name__ == "__main__":
+    GOOGLE_API_KEY = "YOUR_API_KEY_HERE"          # ganti dengan milikmu
+    moviebot = create_agent(GOOGLE_API_KEY)
+
+    # panggil agent – CUKUP kirim field 'input'
+    reply = moviebot.invoke({
+        "input": "Rekomendasikan film action era 2010-an dong!"
+    })
+    print("🎬 BOT:", reply["output"])
