@@ -1,54 +1,58 @@
 import streamlit as st
-from movai_core import create_agent  
+from movai_core import create_agent   
 
-st.set_page_config(page_title="🎬 MovAI - Your Movie Chatbot")
+st.set_page_config(page_title="🎬 MovAI - MovieBot")
 st.title("🎬 MovAI - MovieBot")
-st.markdown("Ask anything about movies")
+st.markdown("Ask anything about movies!")
 
-# === Input Gemini API Key ===
-google_api_key = st.text_input("🔑 Enter your Google Gemini API Key", type="password")
+# ── API key input ──────────────────────────────────────────────────────────────
+api_key = st.text_input("🔑 Enter your Google Gemini API key", type="password")
 
-# === Initialize state: chat history and agent ===
-if "chat_messages" not in st.session_state:
-    st.session_state.chat_messages = []
+# ── Chat history for UI only ( tuples of role, text ) ─────────────────────────
+if "chat_ui" not in st.session_state:
+    st.session_state.chat_ui = []
 
+# ── Rebuild the agent whenever the API key CHANGES ────────────────────────────
+key_changed = api_key and api_key != st.session_state.get("saved_api_key")
+
+if key_changed:
+    st.session_state.saved_api_key = api_key
+    st.session_state.agent = create_agent(api_key)
+
+# If no key yet, stop here
 if "agent" not in st.session_state:
-    st.session_state.agent = create_agent(google_api_key)
+    st.warning("🚨 Please enter your API key to start chatting.")
+    st.stop()
 
-# === Setup agent only after API key provided ===
-if not google_api_key:
-    st.warning("🚨 Please enter your Google Gemini API key to start chatting.")
-else:
-    if st.session_state.agent is None:
-        try:
-            st.session_state.agent = create_agent(google_api_key)
-            st.success("✅ API Key entered successfully. You can now start chatting with MovieBot!")
-            st.markdown("👋 Hi there! I'm MovAI. Feel free to ask me anything about movies ")
-        except Exception as e:
-            st.error(f"❌ Failed to initialize agent: {e}")
-            st.stop()
+# ── Reset chat button – clears UI + agent memory –────────────────────────────
+def reset_chat():
+    st.session_state.chat_ui = []
+    st.session_state.agent.memory.clear()     # LangChain memory reset
 
-# === Display previous chat messages ===
-for role, msg in st.session_state.chat_messages:
+st.sidebar.button("🔄  Reset chat", on_click=reset_chat)
+
+# ── Display past messages ─────────────────────────────────────────────────────
+for role, msg in st.session_state.chat_ui:
     with st.chat_message(role):
         st.markdown(msg)
 
-# === Chat input box ===
+# ── Chat input ────────────────────────────────────────────────────────────────
 user_input = st.chat_input("Type your message here...")
 
-# === On message input, run agent and display response ===
-if user_input and st.session_state.agent:
+if user_input:
+    # show user bubble
     with st.chat_message("user"):
         st.markdown(user_input)
-    st.session_state.chat_messages.append(("user", user_input))
+    st.session_state.chat_ui.append(("user", user_input))
 
-    friendly_input = f"{user_input}. Please answer simply and include a short follow-up."
-
+    # call the agent
     with st.chat_message("assistant"):
-        with st.spinner("🎮 MovieBot is thinking..."):
+        with st.spinner("🎬 MovieBot is thinking..."):
             try:
-                response = st.session_state.agent.run(friendly_input)
-                st.markdown(response)
-                st.session_state.chat_messages.append(("assistant", response))
+                reply = st.session_state.agent.run(user_input)
             except Exception as e:
                 st.error(f"❌ Error running agent: {e}")
+                st.stop()
+            st.markdown(reply)
+
+    st.session_state.chat_ui.append(("assistant", reply))
