@@ -77,7 +77,7 @@ def _rag_answer(api_key: str, question: str) -> str:
     return llm.predict(prompt)
 
 # === Simple Data-frame tools ==================================================
-def search_movie(title: str):
+def search_movie(title):
     m = DF[DF.movie_name_clean.str.contains(title.strip().lower(), na=False)]
     return (
         m[["movie_name", "genre", "director"]].head(3).to_string(index=False)
